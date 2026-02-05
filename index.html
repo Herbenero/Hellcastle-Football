@@ -598,7 +598,7 @@
           </div>
 
           <div style="font-size:0.8rem;color:var(--muted);margin-bottom:4px;">
-            Hole scoring: Top = 1 hole (20 yds), Middle = 2 hole (30 yds), Bottom = 3 hole (40 yds), On Board = 10 yds, Miss = 0.
+            Hole scoring: Top = 1 hole (30 yds), Middle = 2 hole (20 yds), Bottom = 3 hole (40 yds), On Board = 10 yds, Miss = 0.
           </div>
 
           <div class="play-mode-row">
@@ -1015,8 +1015,8 @@
       ensureYardLine(player);
       let gain = 0;
       if (result === "board") gain = 10;
-      if (result === "top") gain = 20;
-      if (result === "middle") gain = 30;
+      if (result === "top") gain = 30;
+      if (result === "middle") gain = 20;
       if (result === "bottom") gain = 40;
       player.yardLine += gain;
       if (player.yardLine >= 100) {
@@ -1059,8 +1059,8 @@
       const nextPlayer = players[nextIndex];
       let start = 25;
       if (result === "bottom") start = 10;
-      else if (result === "middle") start = 15;
-      else if (result === "top") start = 20;
+      else if (result === "middle") start = 20;
+      else if (result === "top") start = 15;
       else if (result === "board") start = 25;
       else if (result === "miss") start = 30;
       ensureYardLine(nextPlayer);
