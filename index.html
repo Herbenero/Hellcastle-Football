@@ -141,9 +141,10 @@
     isHealersRound: false,
     healerTurnsLeft: 0,
     turnsUntilCoin: Math.floor(Math.random() * 13) + 3,
-    activeCoins: [],
-    history: []
+    activeCoins: []
   };
+
+  let historyStack = [];
 
   function addPlayerInput() {
     const container = document.getElementById('player-inputs');
@@ -174,20 +175,19 @@
       isAlive: true
     }));
 
+    historyStack = [];
     document.getElementById('setup-screen').classList.add('hidden');
     document.getElementById('game-screen').classList.remove('hidden');
     render();
   }
 
   function saveState() {
-    gameState.history.push(JSON.parse(JSON.stringify(gameState)));
+    historyStack.push(JSON.parse(JSON.stringify(gameState)));
   }
 
   function undo() {
-    if (gameState.history.length === 0) return;
-    const previous = gameState.history.pop();
-    previous.history = gameState.history;
-    gameState = previous;
+    if (historyStack.length === 0) return;
+    gameState = historyStack.pop();
     render();
   }
 
@@ -225,8 +225,8 @@
     if (gameState.dartsThrownThisTurn >= gameState.maxDartsThisTurn) return;
 
     saveState();
-    handleActionThrow();
     gameState.dartsThrownThisTurn++;
+    handleActionThrow();
 
     const activePlayer = gameState.players[gameState.activePlayerIdx];
 
@@ -285,11 +285,13 @@
       gameState.healerTurnsLeft = getAliveCount();
     }
 
-    // Safely advance turn index with modulo to prevent out-of-bounds crashes
+    // Advance to next active player
     if (getAliveCount() > 0) {
+      let attempts = 0;
       do {
         gameState.activePlayerIdx = (gameState.activePlayerIdx + 1) % gameState.players.length;
-      } while (!gameState.players[gameState.activePlayerIdx].isAlive);
+        attempts++;
+      } while (!gameState.players[gameState.activePlayerIdx].isAlive && attempts < gameState.players.length);
     }
 
     render();
