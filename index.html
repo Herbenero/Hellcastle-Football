@@ -285,10 +285,12 @@
       gameState.healerTurnsLeft = getAliveCount();
     }
 
-    // Find next alive player
-    do {
-      gameState.activePlayerIdx = (gameState.activePlayerIdx + 1) % gameState.players.length;
-    } while (!gameState.players[gameState.activePlayerIdx].isAlive);
+    // Safely advance turn index with modulo to prevent out-of-bounds crashes
+    if (getAliveCount() > 0) {
+      do {
+        gameState.activePlayerIdx = (gameState.activePlayerIdx + 1) % gameState.players.length;
+      } while (!gameState.players[gameState.activePlayerIdx].isAlive);
+    }
 
     render();
   }
