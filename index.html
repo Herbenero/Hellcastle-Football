@@ -24,6 +24,7 @@
     
     h1, h2, h3 { text-align: center; margin-bottom: 1rem; }
     button { cursor: pointer; border: none; border-radius: 6px; font-weight: bold; transition: all 0.2s; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
     input, select { background: #0f172a; color: var(--text); border: 1px solid var(--border); padding: 0.5rem; border-radius: 4px; }
     
     /* Setup Screen */
@@ -37,8 +38,10 @@
     /* Game Layout */
     .hidden { display: none !important; }
     .banner { background: var(--heal); color: black; font-weight: bold; text-align: center; padding: 0.5rem; border-radius: 6px; margin-bottom: 1rem; text-transform: uppercase; }
+    .turn-status { text-align: center; font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; color: var(--accent); }
     .coins-container { display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem; flex-wrap: wrap; }
     .coin { background: rgba(234, 179, 8, 0.15); border: 2px dashed var(--coin); padding: 0.75rem 1rem; border-radius: 8px; text-align: center; cursor: pointer; animation: pulse 1.5s infinite alternate; }
+    .coin.disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
     @keyframes pulse { 0% { transform: scale(0.98); } 100% { transform: scale(1.02); } }
 
     /* Player Grid */
@@ -61,7 +64,7 @@
     .actions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.3rem; margin-top: 0.5rem; }
     .actions-grid.has-quad { grid-template-columns: repeat(4, 1fr); }
     .btn-action { background: #334155; color: white; padding: 0.4rem; font-size: 0.8rem; border-radius: 4px; }
-    .btn-action:hover { filter: brightness(1.2); }
+    .btn-action:hover:not(:disabled) { filter: brightness(1.2); }
 
     /* Controls Bar */
     .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; background: var(--card-bg); padding: 1rem; border-radius: 10px; border: 1px solid var(--border); }
@@ -113,16 +116,17 @@
   <!-- GAME SCREEN -->
   <div id="game-screen" class="hidden">
     <div id="healer-banner" class="banner hidden">✨ Healer's Round Active! Hit your target to heal! ✨</div>
+    <div id="turn-status" class="turn-status">Darts Thrown: 0 / 3</div>
     <div id="coins-container" class="coins-container"></div>
 
     <div id="players-grid" class="players-grid"></div>
 
     <div class="controls">
-      <button class="btn-control btn-miss" onclick="registerThrow('miss')">Miss</button>
-      <button class="btn-control btn-bull" onclick="registerThrow('outer_bull')">Outer Bull (+1 Shield)</button>
-      <button class="btn-control btn-bull" onclick="registerThrow('dbull')">D-Bull (+3 Shield)</button>
-      <button class="btn-control btn-undo" onclick="undo()">Undo</button>
-      <button class="btn-control btn-next" onclick="nextTurn()">Next Turn ➔</button>
+      <button id="btn-miss" class="btn-control btn-miss" onclick="registerThrow('miss')">Miss</button>
+      <button id="btn-obull" class="btn-control btn-bull" onclick="registerThrow('outer_bull')">Outer Bull (+1 Shield)</button>
+      <button id="btn-dbull" class="btn-control btn-bull" onclick="registerThrow('dbull')">D-Bull (+3 Shield)</button>
+      <button id="btn-undo" class="btn-control btn-undo" onclick="undo()">Undo</button>
+      <button id="btn-next" class="btn-control btn-next" onclick="nextTurn()">Next Turn ➔</button>
     </div>
   </div>
 </div>
@@ -132,6 +136,8 @@
     boardType: 'basic',
     players: [],
     activePlayerIdx: 0,
+    dartsThrownThisTurn: 0,
+    maxDartsThisTurn: 3,
     isHealersRound: false,
     healerTurnsLeft: 0,
     turnsUntilCoin: Math.floor(Math.random() * 13) + 3,
@@ -162,7 +168,7 @@
       id: idx,
       name: name || `Player ${idx + 1}`,
       target: targets[idx],
-      hp: 10,
+      hp: 15,
       maxHp: 15,
       shield: 0,
       isAlive: true
@@ -180,7 +186,6 @@
   function undo() {
     if (gameState.history.length === 0) return;
     const previous = gameState.history.pop();
-    // Preserve history array itself when rolling back
     previous.history = gameState.history;
     gameState = previous;
     render();
@@ -191,7 +196,6 @@
   }
 
   function handleActionThrow() {
-    // Decrement powerup coin counters when a physical throw happens
     gameState.turnsUntilCoin--;
     if (gameState.turnsUntilCoin <= 0 && gameState.activeCoins.length < 2) {
       spawnCoin();
@@ -210,14 +214,19 @@
   }
 
   function claimCoin(coinId) {
+    if (gameState.dartsThrownThisTurn >= gameState.maxDartsThisTurn) return;
     saveState();
     gameState.activeCoins = gameState.activeCoins.filter(c => c.id !== coinId);
+    gameState.maxDartsThisTurn = 4;
     render();
   }
 
   function registerThrow(type, targetPlayerId = null, multiplier = 1) {
+    if (gameState.dartsThrownThisTurn >= gameState.maxDartsThisTurn) return;
+
     saveState();
     handleActionThrow();
+    gameState.dartsThrownThisTurn++;
 
     const activePlayer = gameState.players[gameState.activePlayerIdx];
 
@@ -257,6 +266,10 @@
   function nextTurn() {
     saveState();
 
+    // Reset turn dart counter
+    gameState.dartsThrownThisTurn = 0;
+    gameState.maxDartsThisTurn = 3;
+
     // Age power-up coins
     gameState.activeCoins.forEach(c => c.turnsLeft--);
     gameState.activeCoins = gameState.activeCoins.filter(c => c.turnsLeft > 0);
@@ -267,7 +280,7 @@
       if (gameState.healerTurnsLeft <= 0) {
         gameState.isHealersRound = false;
       }
-    } else if (Math.random() < 0.12) { // Random chance to trigger Healer's Round
+    } else if (Math.random() < 0.12) {
       gameState.isHealersRound = true;
       gameState.healerTurnsLeft = getAliveCount();
     }
@@ -288,6 +301,20 @@
   }
 
   function render() {
+    const turnLimitReached = gameState.dartsThrownThisTurn >= gameState.maxDartsThisTurn;
+
+    // Status Banner
+    const turnStatus = document.getElementById('turn-status');
+    turnStatus.innerText = `Darts Thrown: ${gameState.dartsThrownThisTurn} / ${gameState.maxDartsThisTurn}`;
+    if (turnLimitReached) {
+      turnStatus.innerText += ' (Turn Complete - Press Next Turn)';
+    }
+
+    // Control Buttons Lock
+    document.getElementById('btn-miss').disabled = turnLimitReached;
+    document.getElementById('btn-obull').disabled = turnLimitReached;
+    document.getElementById('btn-dbull').disabled = turnLimitReached;
+
     // Healer Banner
     const banner = document.getElementById('healer-banner');
     if (gameState.isHealersRound) banner.classList.remove('hidden');
@@ -298,9 +325,11 @@
     coinsDiv.innerHTML = '';
     gameState.activeCoins.forEach(coin => {
       const cEl = document.createElement('div');
-      cEl.className = 'coin';
+      cEl.className = `coin ${turnLimitReached ? 'disabled' : ''}`;
       cEl.innerHTML = `🪙 Hit <strong>${coin.segment}</strong><br><small>Expires in ${coin.turnsLeft} turns (Tap to Claim)</small>`;
-      cEl.onclick = () => claimCoin(coin.id);
+      cEl.onclick = () => {
+        if (!turnLimitReached) claimCoin(coin.id);
+      };
       coinsDiv.appendChild(cEl);
     });
 
@@ -323,19 +352,19 @@
           actionButtonsHtml = `
             <div style="margin-top:0.5rem; text-align:center; font-size:0.8rem; color:var(--heal);">Self Heal Options:</div>
             <div class="actions-grid ${hasQuad ? 'has-quad' : ''}">
-              <button class="btn-action" style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 1)">+1 Single</button>
-              <button class="btn-action" style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 2)">+2 Double</button>
-              <button class="btn-action" style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 3)">+3 Triple</button>
-              ${hasQuad ? `<button class="btn-action" style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 4)">+4 Quad</button>` : ''}
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 1)">+1 Single</button>
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 2)">+2 Double</button>
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 3)">+3 Triple</button>
+              ${hasQuad ? `<button class="btn-action" ${turnLimitReached ? 'disabled' : ''} style="background:var(--heal); color:black;" onclick="registerThrow('heal', ${p.id}, 4)">+4 Quad</button>` : ''}
             </div>
           `;
         } else if (!isActive) {
           actionButtonsHtml = `
             <div class="actions-grid ${hasQuad ? 'has-quad' : ''}">
-              <button class="btn-action" onclick="registerThrow('attack', ${p.id}, 1)">Single (-1)</button>
-              <button class="btn-action" onclick="registerThrow('attack', ${p.id}, 2)">Double (-2)</button>
-              <button class="btn-action" onclick="registerThrow('attack', ${p.id}, 3)">Triple (-3)</button>
-              ${hasQuad ? `<button class="btn-action" onclick="registerThrow('attack', ${p.id}, 4)">Quad (-4)</button>` : ''}
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} onclick="registerThrow('attack', ${p.id}, 1)">Single (-1)</button>
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} onclick="registerThrow('attack', ${p.id}, 2)">Double (-2)</button>
+              <button class="btn-action" ${turnLimitReached ? 'disabled' : ''} onclick="registerThrow('attack', ${p.id}, 3)">Triple (-3)</button>
+              ${hasQuad ? `<button class="btn-action" ${turnLimitReached ? 'disabled' : ''} onclick="registerThrow('attack', ${p.id}, 4)">Quad (-4)</button>` : ''}
             </div>
           `;
         }
